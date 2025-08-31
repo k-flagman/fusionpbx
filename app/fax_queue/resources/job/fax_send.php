@@ -394,13 +394,41 @@
 			//$dial_string .= "fax_retry_sleep=180,";
 			$dial_string .= "fax_verbose=true,";
 			//$dial_string .= "fax_use_ecm=off,";
-			$dial_string .= "absolute_codec_string=PCMU,PCMA,";
+			$dial_string .= "absolute_codec_string=\'PCMU,PCMA\',";
 			$dial_string .= "api_hangup_hook='lua app/fax/resources/scripts/hangup_tx.lua'";
 
 		//connect to event socket and send the command
 			if ($fax_status != 'failed' && file_exists($fax_file)) {
 				//send the fax and try another route if the fax fails
 				$fax_command  = "originate {" . $dial_string . ",fax_uri=".$fax_uri."}" . $fax_uri." &txfax('".$fax_file."')";
+				
+				$fax_status = 'sending';
+
+				//update the database to say status to trying and set the command
+				$array['fax_queue'][0]['fax_queue_uuid'] = $fax_queue_uuid;
+				$array['fax_queue'][0]['domain_uuid'] = $domain_uuid;
+				$array['fax_queue'][0]['origination_uuid'] = $origination_uuid;
+				$array['fax_queue'][0]['fax_status'] = $fax_status;
+				$array['fax_queue'][0]['fax_retry_count'] = $fax_retry_count;
+				$array['fax_queue'][0]['fax_retry_date'] = 'now()';
+				$array['fax_queue'][0]['fax_command'] = $fax_command;
+				$array['fax_queue'][0]['fax_response'] = $fax_response;
+
+				//add temporary permissions
+				$p = permissions::new();
+				$p->add('fax_queue_edit', 'temp');
+
+				//save the data
+				$database->app_name = 'fax queue';
+				$database->app_uuid = '3656287f-4b22-4cf1-91f6-00386bf488f4';
+				$database->save($array, false);
+				unset($array);
+
+				//remove temporary permissions
+				$p->delete('fax_queue_edit', 'temp');
+				
+				
+				
 				$fax_response = event_socket::api($fax_command);
 				$response = str_replace("\n", "", $fax_response);
 				$response = trim(str_replace("+OK", "", $response));
