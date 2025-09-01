@@ -99,7 +99,7 @@ function show_upgrade_menu() {
 		echo "Options:\n";
 		foreach ($options as list($key, $label, $description)) {
 			if (!is_numeric($key)) { echo "    "; }
-			echo "  $key) $label" . (($option == 'h') ? " - " . $description : "") . "\n";
+			echo "  $key) $label" . ((!empty($option) && $option == 'h') ? " - " . $description : "") . "\n";
 		}
 		echo "\n";
 		echo "  a) All\n";
@@ -229,6 +229,9 @@ function do_file_permissions($text, settings $settings) {
 		$directories[] = $settings->get('switch', 'storage', null);
 		$directories[] = $settings->get('switch', 'voicemail', null); //normally included in storage but can be different
 
+		//adjust the /var/run/fusionpbx
+		$directories[] = '/var/run/fusionpbx';
+
 		//only set the xml_cdr directory permissions
 		$log_directory = $settings->get('switch', 'log', null);
 		if ($log_directory !== null) {
@@ -254,7 +257,8 @@ function do_file_permissions($text, settings $settings) {
 			//execute
 			exec("chown -R www-data:www-data $dir");
 		}
-	} else {
+	}
+	else {
 		echo ($text['label-not_running_as_root'] ?? "Not root user - operation skipped")."\n";
 	}
 }
