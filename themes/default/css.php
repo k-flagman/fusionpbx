@@ -3134,7 +3134,7 @@ else { //default: white
 
 	@media(min-width: 1200px) {
 		div.hud_details {
-			height: 350px;
+			height: 345.5px;
 			display: block;
 			<?php
 			echo "background: ".($dashboard_detail_background_color[0] ?? '#ffffff').";\n";
@@ -3190,10 +3190,10 @@ else { //default: white
 		display: block;
 		clear: both;
 		background: <?=$dashboard_footer_background_color?>;
-		padding: 4px 0;
+		padding: 6px 0;
 		text-align: center;
 		width: 100%;
-		height: 25px;
+		height: 26.5px;
 		font-size: 13px;
 		line-height: 5px;
 		color: <?=$dashboard_footer_dots_color?>;
@@ -3204,6 +3204,30 @@ else { //default: white
 		color: <?=$dashboard_footer_dots_color_hover?>;
 		background: <?=$dashboard_footer_background_color_hover?>;
 		cursor: pointer;
+		}
+
+/* DASHBOARD EDIT **********************************************************************/
+
+	.chart_type_button {
+		padding: 8px 16px;
+		border: 1px solid rgba(0,0,0,0.1);
+		border-radius: 5px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		}
+
+	.chart_type_button:has(input:checked) {
+		background-color: rgba(142,172,249,0.15);
+		border-color: #8EACF9;
+		}
+
+	.chart_type_button:hover {
+		background-color: rgba(0,0,0,0.03);
+		}
+
+	.chart_type_button i {
+		font-size: 15pt;
 		}
 
 /* PLUGINS ********************************************************************/
