@@ -341,8 +341,10 @@ if (!function_exists('fax_split_dtmf')) {
 				if ($fax_file_extension != "pdf" && $fax_file_extension != "tif") {
 					chdir($dir_fax_temp);
 					$command = $IS_WINDOWS ? '' : 'export HOME=/tmp && ';
-					$command .= 'libreoffice --headless --convert-to pdf --outdir '.$dir_fax_temp.' '.$dir_fax_temp.'/'.escapeshellarg($fax_name).'.'.escapeshellarg($fax_file_extension);
-					exec($command);
+					$command .= 'sudo libreoffice --headless --convert-to pdf --outdir '.$dir_fax_temp.' '.$dir_fax_temp.'/'.escapeshellarg($fax_name).'.'.escapeshellarg($fax_file_extension);
+					file_put_contents("/tmp/fax.log", "Before: " . $command."\n", FILE_APPEND);
+					exec("$command >> /tmp/fax.log 2>&1");
+					file_put_contents("/tmp/fax.log", $command."\n", FILE_APPEND);
 					@unlink($dir_fax_temp.'/'.$fax_name.'.'.$fax_file_extension);
 				}
 
@@ -354,6 +356,8 @@ if (!function_exists('fax_split_dtmf')) {
 					$cmd = exec('which gs')." -q -r".$gs_r." -g".$gs_g." -dBATCH -dPDFFitPage -dNOSAFER -dNOPAUSE -dBATCH -sOutputFile=".escapeshellarg($fax_name).".tif -sDEVICE=tiffg4 -Ilib stocht.ps -c \"{ .75 gt { 1 } { 0 } ifelse} settransfer\" -- ".escapeshellarg($fax_name).".pdf -c quit";
 					// echo($cmd . "<br/>\n");
 					exec($cmd);
+					file_put_contents("/tmp/fax.log", $cmd."\n", FILE_APPEND);
+
 					@unlink($dir_fax_temp.'/'.$fax_name.'.pdf');
 				}
 
