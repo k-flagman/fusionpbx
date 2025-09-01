@@ -341,7 +341,7 @@ if (!function_exists('fax_split_dtmf')) {
 				if ($fax_file_extension != "pdf" && $fax_file_extension != "tif") {
 					chdir($dir_fax_temp);
 					$command = $IS_WINDOWS ? '' : 'export HOME=/tmp && ';
-					$command .= 'libreoffice --headless --convert-to pdf --outdir '.$dir_fax_temp.' '.$dir_fax_temp.'/'.escapeshellarg($fax_name).'.'.escapeshellarg($fax_file_extension);
+					$command .= ' sudo libreoffice --headless --convert-to pdf --outdir '.$dir_fax_temp.' '.$dir_fax_temp.'/'.escapeshellarg($fax_name).'.'.escapeshellarg($fax_file_extension);
 					exec($command);
 					@unlink($dir_fax_temp.'/'.$fax_name.'.'.$fax_file_extension);
 				}
