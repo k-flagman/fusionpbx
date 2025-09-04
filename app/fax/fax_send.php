@@ -1,4 +1,119 @@
 <?php
+/* ===== FAX OPTIMIZATION HELPERS (injected) ===== */
+if (!function_exists('fax_geom_by_paper_res')) {
+    function fax_geom_by_paper_res($paper, $res) {
+        $map = [
+            'letter' => ['normal' => 1078, 'fine' => 2156, 'superfine' => 4312],
+            'legal'  => ['normal' => 1372, 'fine' => 2744, 'superfine' => 5488],
+            'a4'     => ['normal' => 1168, 'fine' => 2336, 'superfine' => 4672],
+        ];
+        $paper = strtolower($paper ?: 'letter');
+        $res   = strtolower($res ?: 'fine');
+        if (!isset($map[$paper])) $paper = 'letter';
+        if (!isset($map[$paper][$res])) $res = 'fine';
+        return [1728, $map[$paper][$res]];
+    }
+}
+
+if (!function_exists('fax_pagesize_string')) {
+    function fax_pagesize_string($paper) {
+        $paper = strtolower($paper ?: 'letter');
+        switch ($paper) {
+            case 'legal': return '8.5inx14in';
+            case 'a4':    return '210mmx297mm';
+            default:      return '8.5inx11in';
+        }
+    }
+}
+
+if (!function_exists('fax_dpi_by_res')) {
+    function fax_dpi_by_res($res) {
+        #return (strtolower($res) === 'standard') ? '204x98' : '204x196';
+        if ($res == 'superfine') {
+            return '204x392';
+        } elseif($res == 'fine') {
+            return '204x196';
+        } else {
+            return '204x98';
+        }
+    }
+}
+
+if (!function_exists('build_img2pdf_cmd')) {
+    function build_img2pdf_cmd($images, $outPdf, $paper='letter', $resolution='fine', $fit='exact') {
+        $img2pdf = trim(shell_exec('which img2pdf'));
+        if (!$img2pdf) { return [null, 'img2pdf not found']; }
+
+        list($w, $h) = fax_geom_by_paper_res($paper, $resolution);
+        $dpi   = fax_dpi_by_res($resolution);
+        $psize = fax_pagesize_string($paper);
+        $geom  = "{$w}x{$h}px";
+        $fit   = ($fit === 'shrink') ? 'shrink' : 'exact';
+
+        $inputs = array_map(function($p){ return escapeshellarg($p); }, $images);
+        $cmd = $img2pdf
+            .' --pagesize '.escapeshellarg($psize)
+            .' --imgsize '.escapeshellarg($geom)
+            .' --fit '.$fit
+            .' --dpi '.$dpi
+            .' --colorspace gray'
+            .' --auto-orient'
+            .' -o '.escapeshellarg($outPdf).' '
+            . implode(' ', $inputs);
+
+        return [$cmd, null];
+    }
+}
+
+if (!function_exists('build_gs_tiffg4_cmd')) {
+    function build_gs_tiffg4_cmd($inputPath, $outTif, $paper='letter', $resolution='fine') {
+        $gs = trim(shell_exec('which gs'));
+        if (!$gs) { return [null, 'Ghostscript not found']; }
+
+        list($w, $h) = fax_geom_by_paper_res($paper, $resolution);
+        $dpi   = fax_dpi_by_res($resolution);
+        $geom  = "{$w}x{$h}";
+
+        $args = [
+            '-q',
+            "-r{$dpi}",
+            '-dBATCH',
+            '-dNOPAUSE',
+            '-dNOSAFER',
+            '-sDEVICE=tiffg4',
+            "-g{$geom}",
+            '-dPDFFitPage',
+            '-dFIXEDMEDIA',
+            '-dDownScaleFactor=2',
+            '-sProcessColorModel=DeviceGray',
+            '-sColorConversionStrategy=Gray',
+            '-dAutoFilterColorImages=false',
+            '-dAutoFilterGrayImages=false',
+            "-sOutputFile=".escapeshellarg($outTif),
+            escapeshellarg($inputPath),
+        ];
+
+        $cmd = $gs.' '.implode(' ', $args);
+        return [$cmd, null];
+    }
+}
+
+if (!function_exists('tiffcp_optimize')) {
+    function tiffcp_optimize($tifPath) {
+        $tiffcp = trim(shell_exec('which tiffcp'));
+        if (!$tiffcp || !file_exists($tifPath)) return;
+        $tmp = $tifPath.'.tmp';
+        $cmd = $tiffcp.' -c g4 -p contig '.escapeshellarg($tifPath).' '.escapeshellarg($tmp);
+        exec($cmd, $o, $rc);
+        if ($rc === 0 && file_exists($tmp)) {
+            @rename($tmp, $tifPath);
+        } else {
+            if (file_exists($tmp)) @unlink($tmp);
+        }
+    }
+}
+/* ===== END FAX OPTIMIZATION HELPERS ===== */
+
 /*
 	FusionPBX
 	Version: MPL 1.1
@@ -359,7 +474,12 @@ if (!function_exists('fax_split_dtmf')) {
 					
 					//convert pdf to tif
 					if ($fax_file_extension != "pdf" && $fax_file_extension != "tif") {
-						$cmd = exec('which gs') . " -q -r$gs_rr -sPAPERSIZE=$fax_page_size  -sDEVICE=tiffscaled -sCompression=g4 -dDownScaleFactor=3 -dAdjustWidth=1 -dFitPage -dFIXEDMEDIA -o " . escapeshellarg($fax_name) .".tif " .  escapeshellarg($fax_name) . ".pdf";
+                        list($gs_cmd, $gs_err) = build_gs_tiffg4_cmd("$fax_name.pdf", "$fax_name.tif", $fax_page_size, $fax_resolution);
+                        if ($gs_err) {
+                            throw new \RuntimeException($gs_err);
+                        }
+						#$cmd = exec('which gs') . " -q -r$gs_rr -sPAPERSIZE=$fax_page_size  -sDEVICE=tiffscaled -sCompression=g4 -dDownScaleFactor=3 -dAdjustWidth=1 -dFitPage -dFIXEDMEDIA -o " . escapeshellarg($fax_name) .".tif " .  escapeshellarg($fax_name) . ".pdf";
+						$cmd = $gs_cmd;
 					} else {					
 						$cmd = exec('which gs')." -q -r".$gs_r." -g".$gs_g." -dBATCH -dPDFFitPage -dNOSAFER -dNOPAUSE -dBATCH -sOutputFile=".escapeshellarg($fax_name).".tif -sDEVICE=tiffg4 -Ilib stocht.ps -c \"{ .75 gt { 1 } { 0 } ifelse} settransfer\" -- ".escapeshellarg($fax_name).".pdf -c quit";
 					}
@@ -1242,4 +1362,27 @@ function showgrid($pdf) {
 }
 */
 
+// === BEGIN: Rewritten Ghostscript invocation for fax-optimized TIFF G4 ===
+/*
+$fax_resolution = isset($fax_resolution) ? $fax_resolution : 'fine';   // 'fine' or 'standard'
+$fax_paper      = isset($fax_page_size) ? strtolower($fax_page_size) : 'letter'; // map your existing var
+
+$input_path  = isset($source_file) ? $source_file : (isset($input_pdf) ? $input_pdf : null);
+$output_path = isset($fax_name) ? ($fax_name . '.tif') : 'out.tif';
+
+if (!$input_path) { throw new \RuntimeException('No input specified for fax conversion'); }
+
+list($gs_cmd, $gs_err) = build_gs_tiffg4_cmd($input_path, $output_path, $fax_paper, $fax_resolution);
+if ($gs_err) { throw new \RuntimeException($gs_err); }
+
+exec($gs_cmd, $o, $rc);
+if ($rc !== 0) { throw new \RuntimeException('Ghostscript failed: rc='.$rc); }
+
+tiffcp_optimize($output_path);
+*/
+// === END: Rewritten Ghostscript invocation ===
+
 ?>
+
+
+
