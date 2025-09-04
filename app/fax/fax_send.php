@@ -287,15 +287,18 @@ if (!function_exists('fax_split_dtmf')) {
 			case 'fine':
 				$gs_r = '204x196';
 				$gs_g = ((int) ($page_width * 204)).'x'.((int) ($page_height * 196));
+				$gs_rr = '612x294';
 				break;
 			case 'superfine':
 				$gs_r = '204x392';
 				$gs_g = ((int) ($page_width * 204)).'x'.((int) ($page_height * 392));
+				$gs_rr = '612x588';
 				break;
 			case 'normal':
 			default:
 				$gs_r = '204x98';
 				$gs_g = ((int) ($page_width * 204)).'x'.((int) ($page_height * 98));
+				$gs_rr = '612x294';
 				break;
 		}
 
@@ -340,26 +343,33 @@ if (!function_exists('fax_split_dtmf')) {
 				//convert uploaded file to pdf, if necessary
 				if ($fax_file_extension != "pdf" && $fax_file_extension != "tif") {
 					chdir($dir_fax_temp);
-					$command = $IS_WINDOWS ? '' : 'export HOME=/tmp && ';
-					$command .= 'sudo libreoffice --headless --convert-to pdf --outdir '.$dir_fax_temp.' '.$dir_fax_temp.'/'.escapeshellarg($fax_name).'.'.escapeshellarg($fax_file_extension);
+					#$command = $IS_WINDOWS ? '' : 'export HOME=/tmp && ';
+					#$command .= 'sudo libreoffice --headless --convert-to pdf --outdir '.$dir_fax_temp.' '.$dir_fax_temp.'/'.escapeshellarg($fax_name).'.'.escapeshellarg($fax_file_extension);
+					$command  = "img2pdf -s$gs_g " . $dir_fax_temp.'/'.escapeshellarg($fax_name).'.'.escapeshellarg($fax_file_extension) . ' -o ' . $dir_fax_temp.'/'.escapeshellarg($fax_name). '.pdf';
 					file_put_contents("/tmp/fax.log", "Before: " . $command."\n", FILE_APPEND);
 					exec("$command >> /tmp/fax.log 2>&1");
 					file_put_contents("/tmp/fax.log", $command."\n", FILE_APPEND);
 
-					@unlink($dir_fax_temp.'/'.$fax_name.'.'.$fax_file_extension);
+					#@unlink($dir_fax_temp.'/'.$fax_name.'.'.$fax_file_extension);
 				}
 
 				//convert uploaded pdf to tif
 				if (file_exists($dir_fax_temp.'/'.$fax_name.'.pdf')) {
 					chdir($dir_fax_temp);
-
+					
 					//convert pdf to tif
-					$cmd = exec('which gs')." -q -r".$gs_r." -g".$gs_g." -dBATCH -dPDFFitPage -dNOSAFER -dNOPAUSE -dBATCH -sOutputFile=".escapeshellarg($fax_name).".tif -sDEVICE=tiffg4 -Ilib stocht.ps -c \"{ .75 gt { 1 } { 0 } ifelse} settransfer\" -- ".escapeshellarg($fax_name).".pdf -c quit";
+					if ($fax_file_extension != "pdf" && $fax_file_extension != "tif") {
+						$cmd = exec('which gs') . " -q -r$gs_rr -sPAPERSIZE=$fax_page_size  -sDEVICE=tiffscaled -sCompression=g4 -dDownScaleFactor=3 -dAdjustWidth=1 -dFitPage -dFIXEDMEDIA -o " . escapeshellarg($fax_name) .".tif " .  escapeshellarg($fax_name) . ".pdf";
+					} else {					
+						$cmd = exec('which gs')." -q -r".$gs_r." -g".$gs_g." -dBATCH -dPDFFitPage -dNOSAFER -dNOPAUSE -dBATCH -sOutputFile=".escapeshellarg($fax_name).".tif -sDEVICE=tiffg4 -Ilib stocht.ps -c \"{ .75 gt { 1 } { 0 } ifelse} settransfer\" -- ".escapeshellarg($fax_name).".pdf -c quit";
+					}
+					#$cmd = exec('which gs')." -q -r".'612x588'." -dBATCH -dPDFFitPage -dNOSAFER -dNOPAUSE -dBATCH -sOutputFile=".escapeshellarg($fax_name).".tif -sDEVICE=tiffg4  -- ".escapeshellarg($fax_name).".pdf -c quit";
+					
 					// echo($cmd . "<br/>\n");
 					exec($cmd);
 					file_put_contents("/tmp/fax.log", $cmd."\n", FILE_APPEND);
 
-					@unlink($dir_fax_temp.'/'.$fax_name.'.pdf');
+					#@unlink($dir_fax_temp.'/'.$fax_name.'.pdf');
 				}
 
 				//get the page count
@@ -622,6 +632,7 @@ if (!function_exists('fax_split_dtmf')) {
 			$cmd .= correct_path($dir_fax_sent.'/'.$fax_instance_uuid.'.tif');
 			//echo($cmd . "<br/>\n");
 			exec($cmd);
+			file_put_contents("/tmp/fax.log", $cmd."\n", FILE_APPEND);
 
 			//generate pdf from tif
 			$cmd = exec('which tiff2pdf').' -u i -p '.$fax_page_size.
@@ -633,10 +644,11 @@ if (!function_exists('fax_split_dtmf')) {
 
 			exec($cmd);
 			//echo $cmd."<br />\n";
+			file_put_contents("/tmp/fax.log", $cmd."\n", FILE_APPEND);
 
 			//remove the extra files
 			foreach ($tif_files as $tif_file) {
-				@unlink($tif_file);
+				#@unlink($tif_file);
 			}
 		}
 		elseif (!defined('STDIN')) {
@@ -852,7 +864,7 @@ if (!function_exists('fax_split_dtmf')) {
 				$database->app_name = 'fax queue';
 				$database->app_uuid = '3656287f-4b22-4cf1-91f6-00386bf488f4';
 				$database->save($array);
-
+				#print_r($database);die;
 				//remove temporary permisison
 				$p->delete('fax_queue_add', 'temp');
 
