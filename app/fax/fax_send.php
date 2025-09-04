@@ -473,7 +473,7 @@ if (!function_exists('fax_split_dtmf')) {
 					chdir($dir_fax_temp);
 					
 					//convert pdf to tif
-					if ($fax_file_extension != "pdf" && $fax_file_extension != "tif") {
+					if ($fax_file_extension != "tif") {
                         list($gs_cmd, $gs_err) = build_gs_tiffg4_cmd("$fax_name.pdf", "$fax_name.tif", $fax_page_size, $fax_resolution);
                         if ($gs_err) {
                             throw new \RuntimeException($gs_err);

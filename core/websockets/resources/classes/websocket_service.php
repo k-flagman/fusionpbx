@@ -387,7 +387,7 @@ class websocket_service extends service {
 		if ($subscriber === null)
 			return;
 
-		$this->debug("Received message from " . $subscriber->id);
+		$this->debug("Received message from " . $subscriber->id . "\nBody: $data\n");
 
 		// Convert the message from json string to a message array
 		$json_array = json_decode($data, true);
